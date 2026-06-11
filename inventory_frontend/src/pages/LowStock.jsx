@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
 
 const API = "http://localhost:8080/products";
 
@@ -17,6 +18,19 @@ export default function LowStock() {
   const [toast, setToast] = useState(null);
   const navigate = useNavigate();
 
+  // Decode role
+  const token = localStorage.getItem("token");
+  let role = "";
+  if (token) {
+    try {
+      const decoded = jwtDecode(token);
+      role = decoded.role || "";
+    } catch (error) {
+      console.error("Invalid token", error);
+    }
+  }
+  const isAdmin = role === "Admin";
+
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 2500);
@@ -24,7 +38,11 @@ export default function LowStock() {
 
   const fetchLowStock = () => {
     setLoading(true);
-    fetch(`${API}/low-stock`)
+    fetch(`${API}/low-stock`, {
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+})
       .then((r) => r.json())
       .then((data) => {
         setProducts(data);
@@ -36,6 +54,7 @@ export default function LowStock() {
   useEffect(() => { fetchLowStock(); }, []);
 
   const handleStockIn = (id) => {
+    if (!isAdmin) return;
     const qty = Number(stockInput[id] || 1);
     fetch(`${API}/${id}/stock-in`, {
       method: "PUT",
@@ -62,8 +81,6 @@ export default function LowStock() {
 
   return (
     <div className={`min-h-screen ${bg} transition-colors duration-300 font-sans`}>
-
-      {/* Toast */}
       {toast && (
         <div className={`fixed top-5 right-5 z-50 px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg ${
           toast.type === "error" ? "bg-red-500 text-white" : "bg-emerald-500 text-white"
@@ -73,8 +90,6 @@ export default function LowStock() {
       )}
 
       <div className="max-w-6xl mx-auto px-6 py-8">
-
-        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <button
@@ -112,7 +127,6 @@ export default function LowStock() {
           </div>
         </div>
 
-        {/* Table */}
         <div className={`rounded-2xl border overflow-hidden ${surface}`}>
           {loading ? (
             <div className={`text-center py-16 text-sm ${muted}`}>Loading...</div>
@@ -130,7 +144,7 @@ export default function LowStock() {
                   <th className="text-left px-4 py-3 font-medium">Category</th>
                   <th className="text-center px-4 py-3 font-medium">Qty</th>
                   <th className="text-right px-4 py-3 font-medium">Price</th>
-                  <th className="text-center px-4 py-3 font-medium">Restock</th>
+                  {isAdmin && <th className="text-center px-4 py-3 font-medium">Restock</th>}
                 </tr>
               </thead>
               <tbody>
@@ -152,27 +166,28 @@ export default function LowStock() {
                       ₹{p.price.toLocaleString("en-IN")}
                     </td>
 
-                    {/* Restock / Stock In only */}
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <input
-                          type="number"
-                          min="1"
-                          placeholder="1"
-                          value={stockInput[p.id] || ""}
-                          onChange={(e) =>
-                            setStockInput((prev) => ({ ...prev, [p.id]: e.target.value }))
-                          }
-                          className={`w-14 text-center text-xs px-2 py-1.5 rounded-lg border outline-none ${inputCls}`}
-                        />
-                        <button
-                          onClick={() => handleStockIn(p.id)}
-                          className="text-xs font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border border-emerald-200 px-3 py-1.5 rounded-lg transition-colors"
-                        >
-                          + Restock
-                        </button>
-                      </div>
-                    </td>
+                    {isAdmin && (
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="1"
+                            value={stockInput[p.id] || ""}
+                            onChange={(e) =>
+                              setStockInput((prev) => ({ ...prev, [p.id]: e.target.value }))
+                            }
+                            className={`w-14 text-center text-xs px-2 py-1.5 rounded-lg border outline-none ${inputCls}`}
+                          />
+                          <button
+                            onClick={() => handleStockIn(p.id)}
+                            className="text-xs font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border border-emerald-200 px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            + Restock
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
